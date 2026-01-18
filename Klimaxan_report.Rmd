@@ -13,10 +13,10 @@ toc-title: "Оглавление"
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-library(tidyverse)
 library(readxl)
 library(readr)
 library(flextable)
+library(knitr)
 library(gtsummary)
 
 set_flextable_defaults(table.layout = "autofit",
@@ -60,6 +60,10 @@ glimpse(data_raw)
 
 
 ``` {r data prep, echo=FALSE}
+data_transformed <- data_raw %>%
+  mutate(
+    across(8:38, as.factor)
+    )
 data_long <- data_raw %>%
   pivot_longer(
     cols = matches("^V[0-9]+_"),
@@ -70,9 +74,88 @@ data_long <- data_raw %>%
     visit = str_extract(var, "^V[0-9]+"),
     varname = str_remove(var, "^V[0-9]+_")
   )
-glimpse(data_long)
+
 ```
 
+# Раздел 1.  Демографические, антроп. данные и исходные характеристики заболевания 
+
+``` {r summary baseline tables, echo=FALSE }
+
+baseline_df <- data_raw %>%
+  mutate(
+    ARM = factor(ARM)
+  ) %>%
+  transmute(
+    ID = USUBJID,
+    "Группа лечения" = ARM,
+    #демография и антропометрия
+    "Пол" = if_else(V0_DEM_SEX == FALSE, "Женский", "Мужской"),
+    "Возраст" = V0_DEM_AGE,
+    "Рост, см" = V0_ANT_HEIGHTCM,
+    "Вес, кг"  = V0_ANT_WEIGHTKG,
+    "ИМТ, кг/м²" = V0_ANT_BMI,
+    
+    #Гормоны и опросники
+    "Эстрадиол (E2)" = V0_HOR_E2,
+    "Фолликулостимулирующий гормон (ФСГ)" = V0_HOR_FSH,
+    "Шкала Грина (баллы)" = V0_SYM_GREENE,
+    "SF-36 (баллы)"       = V0_QOL_SF36,
+    "Приливы (кол-во)"    = V0_SYM_FLASHES,
+    
+    # Витальные показатели
+    "Отклонение ЧСС"   = factor(V0_VIT_HR_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение ЧДД"   = factor(V0_VIT_RR_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение АД"    = factor(V0_VIT_BP_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение температуры"  = factor(V0_VIT_TEMP_ABN, levels = c(0, 1), labels = c("Нет", "Да")),
+    
+    # ЭКГ
+    "Нарушение ритма" = factor(V0_ECG_RHYTHM_ABN, levels = c(0, 1), labels = c("Нет", "Да")),
+    "Изменения ST-T"  = factor(V0_ECG_STT_ABN,    levels = c(0, 1), labels = c("Нет", "Да")),
+    "QT-аномалия"     = factor(V0_ECG_QT_ABN,     levels = c(0, 1), labels = c("Нет", "Да")),
+    
+    #Клинический анализ крови
+    "Гемоглобин"   = V0_CBC_HGB,
+    "Лейкоциты"   = V0_CBC_WBC,
+    "Тромбоциты"   = V0_CBC_PLT,
+    
+    #Биохимия
+    "Креатинин" = V0_BIO_CREAT,
+    "АЛТ"   = V0_BIO_ALT,
+    "АСТ"  = V0_BIO_AST,
+    "Холестерин общий"  = V0_BIO_CHOL,
+    "Гликированный гемоглобин (HbA1c)" = V0_BIO_HBA1C,
+    
+    # Общий анализ мочи 
+    "Белок" = V0_URN_PROT,
+    "Эритроциты" = V0_URN_RBC
+  )
+
+
+make_section_ft <- function(df, vars, title) {
+  df %>%
+    select(`Группа лечения`, all_of(vars)) %>%
+    tbl_summary(
+      by = `Группа лечения`,
+      statistic = list(
+        all_continuous() ~ "\n{mean} ± {sd}\n{median} [{p25}, {p75}]",
+        all_categorical() ~ "{n} ({p}%)"
+      ),
+      digits = all_continuous() ~ 2,
+      missing = "ifany"
+    ) %>%
+    add_p(
+      test = list(
+        all_continuous() ~ "t.test",      
+        all_categorical() ~ "chisq.test"  
+      )
+    ) %>%
+    modify_header(label ~ "**Показатель**") %>%
+    modify_spanning_header(all_stat_cols() ~ "**Группа лечения**") %>%
+    modify_caption(title) %>% 
+    as_flex_table() %>% 
+    autofit() %>%
+    flextable::set_caption(caption = title)
+}
 # Раздел 3. Анализ конечных точек
 
 ## Раздел 3.1 Анализ первичной конечной точки
@@ -501,4 +584,13 @@ overdisp_fun <- function(model) {
   flex_default_fun()
 ```
 
+baseline_table_1 <- make_section_ft (baseline_df, c( "Возраст", "Рост, см", "Вес, кг", "ИМТ, кг/м²"), "Таблица 1. Демография и антропометрия")
+baseline_table_2 <- make_section_ft (baseline_df, c("Эстрадиол (E2)", "Фолликулостимулирующий гормон (ФСГ)", "Шкала Грина (баллы)", "SF-36 (баллы)", "Приливы (кол-во)"),
+                       "Таблица 2. Гормоны, симптомы и качество жизни")
+baseline_table_3 <- make_section_ft (baseline_df, c("Креатинин", "АЛТ", "АСТ", "Холестерин общий", "Гликированный гемоглобин (HbA1c)"), "Таблица 3. Биохимия крови")
+baseline_table_4 <- make_section_ft (baseline_df, c("Белок", "Эритроциты"), "Таблица 4. Показатели мочи")
+baseline_table_5 <- make_section_ft (baseline_df, c("Отклонение ЧСС", "Отклонение ЧДД", "Отклонение АД", "Отклонение температуры"), "Таблица 5. Витальные показатели")
+baseline_table_6 <- make_section_ft (baseline_df, c("Нарушение ритма", "Изменения ST-T", "QT-аномалия"), "Таблица 6. ЭКГ")
+baseline_table_7 <- make_section_ft (baseline_df, c("Гемоглобин", "Лейкоциты", "Тромбоциты"), "Таблица 7. Клинический анализ крови")
+```
 По результатам анализа регрессионной модели нахождению коэффициента и 95%ДИ с помощью теста Вальда для показателя терапии, отношение частоты событий (IRR) при терапии Климаксаном по отношению к группе Анжеликом составляет 0.96 (95%ДИ [0.89 ; 1.04]), p-значение теста коэффициента составило 0.3. Данный 95%ДИ накрывает 1 и $p-value > 0.05$, следовательно, частота НЯ в группах различается не значимо.
