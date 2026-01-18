@@ -83,6 +83,8 @@ data_long <- data_raw %>%
 glimpse(data_long)
 ```
 
+# Раздел 1.  Демографические, антроп. данные и исходные характеристики заболевания 
+
 ``` {r summary baseline tables, echo=FALSE }
 
 baseline_df <- data_raw %>%
