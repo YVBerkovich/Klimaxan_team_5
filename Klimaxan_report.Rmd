@@ -48,7 +48,30 @@ statistics <- list(
 ```
 
 
-<!-- ANCHOR:SECTION_3_2_START -->
+```{r}
+data_raw <- read_csv("team5_ecrf_wide.csv")
+glimpse(data_raw)
+```
+
+
+``` {r data prep, echo=FALSE}
+data_transformed <- data_raw %>%
+  mutate(
+    across(8:38, as.factor)
+    )
+data_long <- data_raw %>%
+  pivot_longer(
+    cols = matches("^V[0-9]+_"),
+    names_to = "var",
+    values_to = "value"
+  ) %>%
+  mutate(
+    visit = str_extract(var, "^V[0-9]+"),
+    varname = str_remove(var, "^V[0-9]+_")
+  )
+
+```
+
 
 ## 3.2 Анализ вторичных конечных точек эффективности клинического исследования
 
@@ -365,5 +388,3 @@ cat(sprintf(
 ))
 
 ```
-
-<!-- ANCHOR:SECTION_3_2_END -->
