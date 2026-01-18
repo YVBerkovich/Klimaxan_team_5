@@ -73,7 +73,9 @@ data_long <- data_raw %>%
 glimpse(data_long)
 ```
 
-# Раздел 1. Анализ первичной конечной точки
+# Раздел 3. Анализ конечных точек
+
+## Раздел 3.1 Анализ первичной конечной точки
 
 Считаем уменьшение приливов к последнему визиту по сравнению с базовым уровнем.
 
@@ -257,6 +259,7 @@ forest_plot <- ggplot(plot_data, aes(x = Estimate, y = Comparison)) +
 
 print(forest_plot)
 ```
+
 ```{r sec-end-time}
 calculate_time_to_reduction_fast <- function(data) {
 
@@ -299,6 +302,7 @@ calculate_time_to_reduction_fast <- function(data) {
 }
 
 data_with_time <- calculate_time_to_reduction_fast(data_raw)
+```
 
 # Раздел 4. Анализ безопасности
 
