@@ -6,9 +6,10 @@ output:
   officedown::rdocx_document:
     reference_docx: "example.docx"
     toc: true
-    toc_depth: 8
+    toc_depth: 6
 toc-title: "Оглавление"
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -209,14 +210,14 @@ baseline_table_7
 
 Считаем уменьшение приливов к последнему визиту по сравнению с базовым уровнем.
 
-```{r primary 1, TRUE=FALSE}
+```{r primary 1, echo=FALSE}
 data_raw <- data_raw %>%
   mutate(delta_f = V0_SYM_FLASHES - V7_SYM_FLASHES)
 ```
 
 ### 3.1.1 Сводная таблица - описательные статистики уменьшения количества приливов к концу периода лечения (12 недель)
 
-```{r primary 2, TRUE=FALSE}
+```{r primary 2, echo=FALSE}
 data_raw <- data_raw %>% 
   mutate(ARM = ARM %>% as.factor() %>% forcats::fct_rev())
 
@@ -322,7 +323,7 @@ t_test_welch %>% broom::tidy() %>%
 
 ### 3.1.3 График изменения частоты приливов в группах лечения
 
-```{r primary 4, echo=TRUE}
+```{r primary4, echo=TRUE}
 density_plot <- ggplot(data_raw, aes(x = delta_f)) +
   geom_histogram(aes(y = after_stat(density), fill = ARM), 
                  alpha = 0.5, position = "identity", bins = 30) +
@@ -345,9 +346,10 @@ density_plot <- ggplot(data_raw, aes(x = delta_f)) +
 
 print(density_plot)
 ```
+
 ### 3.1.4 График ДИ для конечной точки исследования
 
-```{r primary 5, message=FALSE, fig.height=5, fig.width=8, dpi=300}
+```{r primary5, message=FALSE, fig.height=3, fig.width=6, dpi=300}
 # Подготовка данных для графика
 plot_data <- data.frame(
   Comparison = "Климаксан vs Анжелик",
