@@ -1,14 +1,18 @@
 ---
-title: "Klimaxan_report"
-authors: 
+title: "Статистический отчёт по результатам клинического исследования III фазы по изучению эффективности и безопасности Климаксана"
+authors: "Беркович Ян, Гордеев Алексей, Смородина Жанна, Тимкина Наталья"
 date: "2026-01-18"
-output: word_document
+output:
+  officedown::rdocx_document:
+    reference_docx: "example.docx"
+    toc: true
+    toc_depth: 8
+toc-title: "Оглавление"
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-suppressPackageStartupMessages(library(tidyverse))
+library(tidyverse)
 library(readxl)
 library(readr)
 library(flextable)
@@ -48,6 +52,7 @@ statistics <- list(
 ```
 
 
+
 ```{r}
 data_raw <- read_csv("team5_ecrf_wide.csv")
 glimpse(data_raw)
@@ -72,6 +77,343 @@ data_long <- data_raw %>%
 
 ```
 
+# Раздел 1.  Демографические, антроп. данные и исходные характеристики заболевания 
+
+``` {r summary baseline tables, echo=FALSE }
+
+baseline_df <- data_raw %>%
+  mutate(
+    ARM = factor(ARM)
+  ) %>%
+  transmute(
+    ID = USUBJID,
+    "Группа лечения" = ARM,
+    #демография и антропометрия
+    "Пол" = if_else(V0_DEM_SEX == FALSE, "Женский", "Мужской"),
+    "Возраст" = V0_DEM_AGE,
+    "Рост, см" = V0_ANT_HEIGHTCM,
+    "Вес, кг"  = V0_ANT_WEIGHTKG,
+    "ИМТ, кг/м²" = V0_ANT_BMI,
+    
+    #Гормоны и опросники
+    "Эстрадиол (E2)" = V0_HOR_E2,
+    "Фолликулостимулирующий гормон (ФСГ)" = V0_HOR_FSH,
+    "Шкала Грина (баллы)" = V0_SYM_GREENE,
+    "SF-36 (баллы)"       = V0_QOL_SF36,
+    "Приливы (кол-во)"    = V0_SYM_FLASHES,
+    
+    # Витальные показатели
+    "Отклонение ЧСС"   = factor(V0_VIT_HR_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение ЧДД"   = factor(V0_VIT_RR_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение АД"    = factor(V0_VIT_BP_ABN,   levels = c(0, 1), labels = c("Нет", "Да")),
+    "Отклонение температуры"  = factor(V0_VIT_TEMP_ABN, levels = c(0, 1), labels = c("Нет", "Да")),
+    
+    # ЭКГ
+    "Нарушение ритма" = factor(V0_ECG_RHYTHM_ABN, levels = c(0, 1), labels = c("Нет", "Да")),
+    "Изменения ST-T"  = factor(V0_ECG_STT_ABN,    levels = c(0, 1), labels = c("Нет", "Да")),
+    "QT-аномалия"     = factor(V0_ECG_QT_ABN,     levels = c(0, 1), labels = c("Нет", "Да")),
+    
+    #Клинический анализ крови
+    "Гемоглобин"   = V0_CBC_HGB,
+    "Лейкоциты"   = V0_CBC_WBC,
+    "Тромбоциты"   = V0_CBC_PLT,
+    
+    #Биохимия
+    "Креатинин" = V0_BIO_CREAT,
+    "АЛТ"   = V0_BIO_ALT,
+    "АСТ"  = V0_BIO_AST,
+    "Холестерин общий"  = V0_BIO_CHOL,
+    "Гликированный гемоглобин (HbA1c)" = V0_BIO_HBA1C,
+    
+    # Общий анализ мочи 
+    "Белок" = V0_URN_PROT,
+    "Эритроциты" = V0_URN_RBC
+  )
+
+
+make_section_ft <- function(df, vars, title) {
+  df %>%
+    select(`Группа лечения`, all_of(vars)) %>%
+    tbl_summary(
+      by = `Группа лечения`,
+      statistic = list(
+        all_continuous() ~ "\n{mean} ± {sd}\n{median} [{p25}, {p75}]",
+        all_categorical() ~ "{n} ({p}%)"
+      ),
+      digits = all_continuous() ~ 2,
+      missing = "ifany"
+    ) %>%
+    add_p(
+      test = list(
+        all_continuous() ~ "t.test",      
+        all_categorical() ~ "chisq.test"  
+      )
+    ) %>%
+    modify_header(label ~ "**Показатель**") %>%
+    modify_spanning_header(all_stat_cols() ~ "**Группа лечения**") %>%
+    modify_caption(title) %>% 
+    as_flex_table() %>% 
+    autofit() %>%
+    flextable::set_caption(caption = title)
+}
+
+
+baseline_table_1 <- make_section_ft (baseline_df, c( "Возраст", "Рост, см", "Вес, кг", "ИМТ, кг/м²"), "Таблица 1. Демография и антропометрия")
+baseline_table_2 <- make_section_ft (baseline_df, c("Эстрадиол (E2)", "Фолликулостимулирующий гормон (ФСГ)", "Шкала Грина (баллы)", "SF-36 (баллы)", "Приливы (кол-во)"),
+                       "Таблица 2. Гормоны, симптомы и качество жизни")
+baseline_table_3 <- make_section_ft (baseline_df, c("Креатинин", "АЛТ", "АСТ", "Холестерин общий", "Гликированный гемоглобин (HbA1c)"), "Таблица 3. Биохимия крови")
+baseline_table_4 <- make_section_ft (baseline_df, c("Белок", "Эритроциты"), "Таблица 4. Показатели мочи")
+baseline_table_5 <- make_section_ft (baseline_df, c("Отклонение ЧСС", "Отклонение ЧДД", "Отклонение АД", "Отклонение температуры"), "Таблица 5. Витальные показатели")
+baseline_table_6 <- make_section_ft (baseline_df, c("Нарушение ритма", "Изменения ST-T", "QT-аномалия"), "Таблица 6. ЭКГ")
+baseline_table_7 <- make_section_ft (baseline_df, c("Гемоглобин", "Лейкоциты", "Тромбоциты"), "Таблица 7. Клинический анализ крови")
+```
+
+
+```{r print baseline tables, echo=FALSE}
+baseline_table_1
+baseline_table_2
+baseline_table_3
+baseline_table_4
+baseline_table_5
+baseline_table_6
+baseline_table_7
+```
+
+# Раздел 3. Анализ конечных точек
+
+## Раздел 3.1 Анализ первичной конечной точки
+
+Считаем уменьшение приливов к последнему визиту по сравнению с базовым уровнем.
+
+```{r primary 1, echo=FALSE}
+data_raw <- data_raw %>%
+  mutate(delta_f = V0_SYM_FLASHES - V7_SYM_FLASHES)
+```
+
+
+*Сводная таблица *
+
+```{r primary 2, echo=FALSE}
+data_raw <- data_raw %>% 
+  mutate(ARM = ARM %>% as.factor() %>% forcats::fct_rev())
+
+desc_stats <- data_raw %>%
+  group_by(ARM) %>%
+  summarise(
+    n = sum(!is.na(delta_f)),
+    mean_delta = mean(delta_f, na.rm = TRUE),
+    sd_delta = sd(delta_f, na.rm = TRUE),
+    se_delta = sd_delta / sqrt(n),
+    ci_lower = mean_delta - qt(0.975, n-1) * se_delta,
+    ci_upper = mean_delta + qt(0.975, n-1) * se_delta,
+    median_delta = median(delta_f, na.rm = TRUE),
+    min_delta = min(delta_f, na.rm = TRUE),
+    max_delta = max(delta_f, na.rm = TRUE)
+  )
+
+print(desc_stats)
+```
+
+
+
+```{r primary 2-123, echo=FALSE}
+non_inferiority_margin <- -2  
+alpha <- 0.05  
+conf_level <- 1 - alpha  
+
+# Правильные формулировки гипотез:
+# H0: μ_T - μ_R ≤ -2 (Климаксан УСТУПАЕТ Анжелику)
+# H1: μ_T - μ_R > -2 (Климаксан НЕ УСТУПАЕТ Анжелику)
+t_test_noninf <- t.test(delta_f ~ ARM, 
+                       data = data_raw,  
+                       var.equal = FALSE,
+                       conf.level = conf_level / 2,  
+                       alternative = "greater",  
+                       mu = non_inferiority_margin)  
+
+cat("\n=== Результаты t-теста для проверки не меньшей эффективности ===\n")
+cat(sprintf("Граница не меньшей эффективности (дельта): %.2f\n", non_inferiority_margin))
+cat(sprintf("Статистика t: %.3f\n", t_test_noninf$statistic))
+cat(sprintf("Степени свободы: %.2f\n", t_test_noninf$parameter))
+cat(sprintf("Одностороннее p-значение: %.4f\n", t_test_noninf$p.value))
+cat(sprintf("95%% односторонний ДИ: [%.3f, Inf]\n", t_test_noninf$conf.int[1]))
+cat(sprintf("Разность средних (Климаксан - Анжелик): %.3f\n", 
+            -diff(t_test_noninf$estimate)))  
+
+mean_diff <- -diff(t_test_noninf$estimate)
+se_diff <- sqrt(sum(desc_stats$sd_delta^2 / desc_stats$n))
+df_welch <- t_test_noninf$parameter
+margin <- qt(1 - alpha, df_welch) * se_diff
+ci_lower_noninf <- mean_diff - margin
+
+cat(sprintf("\nТочная оценка разности: %.3f\n", mean_diff))
+cat(sprintf("97.5%% односторонний ДИ (нижняя граница): %.3f\n", ci_lower_noninf))
+
+cat("\n=== Вывод о не меньшей эффективности ===\n")
+if (t_test_noninf$p.value < alpha && ci_lower_noninf > non_inferiority_margin) {
+  cat("ОТВЕРГАЕМ H0: Климаксан НЕ УСТУПАЕТ Анжелику.\n")
+  cat(sprintf("Нижняя граница 95%% ДИ (%.3f) > границы не меньшей эффективности (%.2f)\n", 
+              ci_lower_noninf, non_inferiority_margin))
+} else {
+  cat("НЕ ОТВЕРГАЕМ H0: Не удалось доказать не меньшую эффективность Климаксана.\n")
+  cat(sprintf("Нижняя граница 95%% ДИ (%.3f) ≤ границе не меньшей эффективности (%.2f)\n", 
+              ci_lower_noninf, non_inferiority_margin))
+}
+```
+
+
+
+```{r primary 3, echo=FALSE}
+cat("\n=== Двусторонний t-тест Уэлча для общего сравнения ===\n")
+t_test_welch <- t.test(delta_f ~ ARM, 
+                      data = data_raw,
+                      var.equal = FALSE,
+                      conf.level = 0.95)
+t_test_welch %>% broom::tidy() %>% 
+  mutate(p.value = p.value %>% gtsummary::style_pvalue()) %>%
+  mutate(across(c(where(is.numeric), -p.value), ~round(.x, 2))) %>%
+  mutate(across(everything(), ~as.character(.x))) %>% 
+  select(-c(method, alternative)) %>% 
+   rename(
+    `Разница средних между гр. Климаксана и гр. Анжелика` = estimate,
+    `Среднее в гр. Климаксана` = estimate1,
+    `Среднее в гр. Анжелика` = estimate2,
+    `t-статистика` = statistic,
+    `Степени свободы` = parameter,
+    `P-value` = p.value,
+    `Нижн. гр. 95% ДИ` = conf.low,
+    `Верхн. гр. 95% ДИ` = conf.high
+  ) %>% 
+  pivot_longer(everything(),
+               names_to = "Параметр",
+               values_to = "Значение") %>% 
+  flextable() %>% 
+  flex_default_fun() %>% 
+  add_header_row(values = "Двусторонний t-тест Уэлча для общего сравнения",
+                 colwidths = 2)
+```
+
+
+
+```{r primary 4, echo=FALSE}
+density_plot <- ggplot(data_raw, aes(x = delta_f)) +
+  geom_histogram(aes(y = after_stat(density), fill = ARM), 
+                 alpha = 0.5, position = "identity", bins = 30) +
+  geom_density(alpha = 0.3, aes(fill = ARM)) +
+  geom_vline(data = desc_stats, aes(xintercept = mean_delta, color = ARM),
+             linetype = "dashed", linewidth = 1) +
+  facet_wrap(~ARM, ncol = 1) +
+  scale_fill_manual(values = c("Climaksan" = "blue", "Angelique" = "red"),
+                    labels = c("Climaksan" = "Климаксан", "Angelique" = "Анжелик")) +
+  scale_color_manual(values = c("Climaksan" = "darkblue", "Angelique" = "darkred"),
+                    labels = c("Climaksan" = "Климаксан", "Angelique" = "Анжелик")) +
+  labs(title = "Распределение изменений частоты приливов",
+       x = "Изменение частоты приливов (приливы/сутки)",
+       y = "Плотность распределения",
+       color = "Терапия",
+       fill = "Терапия",
+       caption = "Пунктирная линия = среднее значение") +
+  theme_minimal() +
+  theme(strip.text.x = element_blank())
+
+print(density_plot)
+```
+
+
+
+```{r primary 5, echo=FALSE}
+library(ggplot2)
+library(dplyr)
+
+# Подготовка данных для графика
+plot_data <- data.frame(
+  Comparison = "Климаксан vs Анжелик",
+  Estimate = -3.236,
+  CI_lower = -3.663,
+  CI_upper = -2.809,
+  Margin = -2,
+  p_value = 1.000
+)
+
+# Создание графика
+forest_plot <- ggplot(plot_data, aes(x = Estimate, y = Comparison)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = -2, linetype = "solid", color = "red", size = 1) +
+  geom_point(size = 4, color = "blue") +
+  geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), 
+                 height = 0.1, size = 1, color = "blue") +
+  geom_rect(aes(xmin = -Inf, xmax = -2, ymin = -Inf, ymax = Inf),
+            fill = "red", alpha = 0.05) +
+  annotate("text", x = -2, y = 1.2, 
+           label = "Граница не меньшей эффективности\n(-2 прилива/сутки)",
+           hjust = 0.5, vjust = 0, color = "red", fontface = "bold") +
+  annotate("text", x = -3.236, y = 0.7, 
+           label = sprintf("Разность средних: %.3f\n95%% ДИ: [%.3f; %.3f]\nP = %.4f", 
+                          -3.236, -3.663, -2.809, 1.000),
+           hjust = 0.5, vjust = 0.5, color = "black") +
+  scale_x_continuous(breaks = seq(-5, 1, 0.5),
+                     limits = c(-5, 1),
+                     name = "Разность средних (Климаксан - Анжелик)\nприливы/сутки") +
+  labs(title = "Анализ не меньшей эффективности",
+       subtitle = "Первичная конечная точка: изменение частоты приливов",
+       y = "") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    axis.title.x = element_text(size = 11, face = "bold"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+
+print(forest_plot)
+```
+
+
+
+```{r sec-end-time}
+calculate_time_to_reduction_fast <- function(data) {
+
+  visit_days <- c(0, 15, 30, 45, 60, 75, 90)
+
+  flash_cols <- c("V0_SYM_FLASHES", "V2_SYM_FLASHES", "V3_SYM_FLASHES", 
+                  "V4_SYM_FLASHES", "V5_SYM_FLASHES", "V6_SYM_FLASHES", 
+                  "V7_SYM_FLASHES")
+  
+  results <- data_raw %>%
+    mutate(
+      baseline = V0_SYM_FLASHES,
+      target = baseline - 2,
+      reduction_day = case_when(
+        !is.na(V2_SYM_FLASHES) & V2_SYM_FLASHES <= target ~ 15,
+        !is.na(V3_SYM_FLASHES) & V3_SYM_FLASHES <= target ~ 30,
+        !is.na(V4_SYM_FLASHES) & V4_SYM_FLASHES <= target ~ 45,
+        !is.na(V5_SYM_FLASHES) & V5_SYM_FLASHES <= target ~ 60,
+        !is.na(V6_SYM_FLASHES) & V6_SYM_FLASHES <= target ~ 75,
+        !is.na(V7_SYM_FLASHES) & V7_SYM_FLASHES <= target ~ 90,
+        TRUE ~ NA_real_
+      ),
+      event_status = if_else(is.na(reduction_day), 0, 1),
+      
+      time_to_event = if_else(
+        event_status == 1,
+        reduction_day,
+        90
+      ),
+      
+      time_to_event = case_when(
+        is.na(baseline) | baseline < 2 ~ NA_real_,
+        event_status == 1 ~ reduction_day,
+        TRUE ~ 90
+      )
+    ) %>%
+    select(-c(target, reduction_day))
+  
+  return(results)
+}
+
+data_with_time <- calculate_time_to_reduction_fast(data_raw)
+```
 
 ## 3.2 Анализ вторичных конечных точек эффективности клинического исследования
 
@@ -388,3 +730,202 @@ cat(sprintf(
 ))
 
 ```
+
+# Раздел 4. Анализ безопасности
+
+```{r AE-df}
+not_ADAE <- data_raw %>% 
+  select(USUBJID, ARM, contains("_ABN")) %>% 
+  mutate(ARM = ARM %>% as.factor()) %>% 
+  rename_with(~str_remove(.x, "_ABN"), contains("_ABN")) %>% 
+  pivot_longer(!c(USUBJID, ARM),
+               names_to = c("AVISIT", "DOMAIN", "PARAM"),
+               names_sep = "_",
+               names_transform = list(AVISIT = as.factor,
+                                      DOMAIN = as.factor,
+                                      PARAM = as.factor),
+               values_to = "AVAL", 
+               values_transform = list(AVAL = as.logical)) %>% 
+  rename(TRTA = ARM) %>% 
+  filter(AVISIT != "V0")
+```
+
+## 4.1 Анализ связи типа нежелательного явления и терапии
+
+```{r}
+any_AE <- not_ADAE %>% 
+  group_by(USUBJID, TRTA, PARAM) %>% 
+  summarise(AVAL = any(AVAL == TRUE)) %>% 
+  ungroup()
+```
+
+```{r chi-sq-table-wide, eval=FALSE, echo=FALSE}
+# {any_AE %>%
+#   mutate(TRTA = case_when(TRTA == "Angelique" ~ "Анжелик",
+#                           TRTA == "Climaksan" ~ "Климаксан") %>% as.factor,
+#          PARAM = case_when(PARAM == "BP" ~ "Артериальное давление",
+#                            PARAM == "HR" ~ "ЧСС",
+#                            PARAM == "RR" ~ "ЧДД",
+#                            PARAM == "TEMP" ~ "Температура",
+#                            PARAM == "RHYTHM" ~ "Сердечный ритм",
+#                            PARAM == "STT" ~ "Сегменты ST-T",
+#                            PARAM == "QT" ~ "Интервал QT") %>% as.factor(),
+#          AVAL = case_when(AVAL == TRUE ~ "Да",
+#                           AVAL == FALSE ~ "Нет") %>% as.factor()) %>% 
+#   select(-USUBJID) %>%
+#   rename("Терапия" = TRTA) %>% 
+#   tbl_strata(strata = PARAM, .tbl_fun = ~.x %>% 
+#                tbl_summary(by = AVAL,
+#                            statistic = c(all_categorical() ~ "{n} ({p})"),
+#                            digits = c(all_categorical() ~ c(2,2))
+#                            ) %>%
+#                add_p(test = list(all_categorical() ~ "chisq.test"),
+#                      test.args = list(correct = TRUE))  %>%
+#                modify_footnote(
+#                  p.value ~ "χ2 с поправкой Йейтса"
+#                  ) %>%
+#                modify_header(label ~ "Группа")) %>% 
+#   as_flex_table() %>% 
+#   flex_default_fun()} %>% 
+#   add_header_row(values =  "Наличие клинически значимых отклонений по типам показателей и терапии", colwidths = length(.$col_keys))
+```
+
+```{r chi-sq-tb-long}
+table_final_chi_sq <-
+  {any_AE %>%
+  mutate(
+    TRTA = case_when(
+      TRTA == "Angelique" ~ "Анжелик",
+      TRTA == "Climaksan" ~ "Климаксан",
+      TRUE ~ TRTA
+    ) %>% factor(),
+    PARAM = case_when(
+      PARAM == "BP" ~ "Артериальное давление",
+      PARAM == "HR" ~ "ЧСС",
+      PARAM == "RR" ~ "ЧДД",
+      PARAM == "TEMP" ~ "Температура",
+      PARAM == "RHYTHM" ~ "Сердечный ритм",
+      PARAM == "STT" ~ "Сегменты ST-T",
+      PARAM == "QT" ~ "Интервал QT",
+      TRUE ~ PARAM
+    ) %>% factor(),
+    AVAL = case_when(AVAL == TRUE ~ "Да", AVAL == FALSE ~ "Нет", TRUE ~ as.character(AVAL)) %>% factor()
+  ) %>%
+    pivot_wider(names_from = PARAM, values_from = AVAL) %>%
+    rename("Терапия" = TRTA) %>%
+    select(-USUBJID) %>%
+    tbl_summary(
+    by = `Терапия`,
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    digits = all_categorical() ~ 1
+      ) %>%
+    add_p(
+    test = all_categorical() ~ "chisq.test",
+    test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+    modify_header(label ~ "Параметр / Группа") %>%
+    modify_footnote(p.value ~ "χ2 с поправкой Йейтса") %>%
+    bold_labels() %>% 
+  as_flex_table() %>% 
+  flex_default_fun()} %>% 
+  add_header_row(values =  "Наличие клинически значимых отклонений по типам показателей и терапии", colwidths = length(.$col_keys))
+```
+
+\newpage
+**Сводная таблица по типам НЯ в зависимости от группы терапии**
+
+```{r AE-type-table}
+table_final_chi_sq
+```
+
+По результатам анализа мы не обнаружили значимой ассоциации НЯ различных типов с терапией.
+
+## 4.2 Анализ количества НЯ по типу терапии
+
+Используем регрессию Пуассона для частотных данных.
+
+Формула модели:
+
+$N_events ~ Pois(λ_x)$
+
+$log(E(N_events | Treatment)) = log(λ_x)$
+
+$var(N_events | Treatment) = λ_x$
+
+$log(λ_x) = b_0 + b_1 × Treatment$
+
+Допущения: 
+
+    1) Независимость наблюдений;
+    
+    2) Отсутствие сверхдисперсии (проверяется далее);
+    
+    3) Отсутствие коллинеарности предикторов (у нас один предиктор, неприменимо).
+
+```{r mod-pois}
+poisson_df <- not_ADAE %>% 
+  group_by(USUBJID, TRTA) %>% 
+  summarise(AVAL_num = sum(AVAL, na.rm = TRUE)) %>% 
+  ungroup()
+
+glm_AE <- glm(AVAL_num ~ TRTA,
+              data = poisson_df,
+              family = "poisson")
+```
+
+**Проверка модели на сверхдисперсию**
+
+```{r pois-overdisp}
+# Функция для проверки наличия сверхдисперсии в модели (автор Ben Bolker)
+# http://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
+# Код модифицирован, чтобы учесть дополнительный параметр в NegBin GLMM, 
+# подобранных MASS::glm.nb()
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)  # Число степеней свободы N - p
+  if (any(class(model) == 'negbin')) rdf <- rdf - 1 ## учитываем k в NegBin GLMM
+  rp <- residuals(model,type='pearson') # Пирсоновские остатки
+  Pearson.chisq <- sum(rp^2) # Сумма квадратов остатков, подчиняется Хи-квадрат распределению 
+  prat <- Pearson.chisq/rdf  # Отношение суммы квадратов остатков к числу степеней свободы
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE) # Уровень значимости
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)        # Вывод результатов
+}
+{overdisp_fun(glm_AE)} %>% 
+  tibble("Names" = names(.)) %>% 
+  rename("Values" = ".") %>% 
+  pivot_wider(names_from = Names, values_from = Values) %>% 
+  mutate(across(c(where(is.numeric), -rdf), ~round(.x, 2))) %>% 
+  rename("χ2" = chisq,
+         "Отношение дисперсий" = ratio,
+         "N степеней свободы" = rdf,
+         "P-value" = p) %>% 
+  flextable() %>% 
+  flex_default_fun() %>% 
+  add_header_row(values = "Результаты теста на сверхдисперсию", colwidth = 4)
+```
+
+Признаков сверхдисперсии не выявлено; в связи с этим переход к квази-пуассоновским или негативно биноминальным моделям не потребовался.
+
+**Сводная таблица результатов анализа общей частоты нежелательных явлений в группах терапии с помощью регрессии Пуассона**
+
+```{r pois-res}
+{glm_AE %>% broom::tidy(exponentiate = TRUE,
+                       conf.int = TRUE) %>%
+     mutate(p.value = p.value %>%  gtsummary::style_pvalue(),
+            across(c(where(is.numeric), - p.value), ~round(.x, 2))) %>% 
+  slice_tail(n = 1) %>% 
+  mutate(term = "Отношение частоты НЯ (IRR)") %>%
+  select(-statistic) %>% 
+  rename(
+    `Показатель` = term,
+    `Коэффициент (β)` = estimate,
+    `Стандартная ошибка` = std.error,
+    `P-value` = p.value,
+    `Нижн. гр. 95% ДИ` = conf.low,
+    `Верхн. гр. 95% ДИ` = conf.high
+    ) %>% 
+  flextable()} %>% 
+  add_header_row(., values = "Отношение частоты НЯ в гр. терапии Климаксаном по сравнению с гр. терапии Анжеликом", colwidth = length(.$col_keys)) %>% 
+  flex_default_fun()
+```
+
+По результатам анализа регрессионной модели нахождению коэффициента и 95%ДИ с помощью теста Вальда для показателя терапии, отношение частоты событий (IRR) при терапии Климаксаном по отношению к группе Анжеликом составляет 0.96 (95%ДИ [0.89 ; 1.04]), p-значение теста коэффициента составило 0.3. Данный 95%ДИ накрывает 1 и $p-value > 0.05$, следовательно, частота НЯ в группах различается не значимо.
