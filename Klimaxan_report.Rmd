@@ -167,6 +167,7 @@ baseline_table_5 <- make_section_ft (baseline_df, c("Отклонение ЧСС
 baseline_table_6 <- make_section_ft (baseline_df, c("Нарушение ритма", "Изменения ST-T", "QT-аномалия"), "Таблица 6. ЭКГ")
 baseline_table_7 <- make_section_ft (baseline_df, c("Гемоглобин", "Лейкоциты", "Тромбоциты"), "Таблица 7. Клинический анализ крови")
 ```
+
 # Раздел 3. Анализ конечных точек
 
 ## Раздел 3.1 Анализ первичной конечной точки
@@ -282,6 +283,7 @@ t_test_welch %>% broom::tidy() %>%
 ```
 
 
+
 ```{r primary 4, echo=FALSE}
 density_plot <- ggplot(data_raw, aes(x = delta_f)) +
   geom_histogram(aes(y = after_stat(density), fill = ARM), 
@@ -305,6 +307,8 @@ density_plot <- ggplot(data_raw, aes(x = delta_f)) +
 
 print(density_plot)
 ```
+
+
 
 ```{r primary 5, echo=FALSE}
 library(ggplot2)
@@ -353,6 +357,8 @@ forest_plot <- ggplot(plot_data, aes(x = Estimate, y = Comparison)) +
 
 print(forest_plot)
 ```
+
+
 
 ```{r sec-end-time}
 calculate_time_to_reduction_fast <- function(data) {
