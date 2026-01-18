@@ -21,5 +21,21 @@ data_raw <- read_csv("team5_ecrf_wide.csv")
 glimpse(data_raw)
 
 ```
+``` {r data prep, echo=FALSE}
+
+data_long <- data_raw %>%
+  pivot_longer(
+    cols = matches("^V[0-9]+_"),
+    names_to = "var",
+    values_to = "value"
+  ) %>%
+  mutate(
+    visit = str_extract(var, "^V[0-9]+"),
+    varname = str_remove(var, "^V[0-9]+_")
+  )
+glimpse(data_long)
+```
+
+
 
 
