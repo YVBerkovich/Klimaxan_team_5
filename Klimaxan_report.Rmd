@@ -1,8 +1,13 @@
 ---
-title: "Klimaxan_report"
+title: "Статистический отчёт по результатам клинического исследования III фазы по изучению эффективности и безопасности Климаксана"
 authors: 
 date: "2026-01-18"
-output: word_document
+output:
+  officedown::rdocx_document:
+    reference_docx: "example.docx"
+    toc: true
+    toc_depth: 8
+toc-title: "Оглавление"
 ---
 
 ```{r setup, include=FALSE}
@@ -12,6 +17,7 @@ suppressPackageStartupMessages(library(tidyverse))
 library(readxl)
 library(readr)
 library(flextable)
+library(gtsummary)
 
 set_flextable_defaults(table.layout = "autofit",
                        font.family = "Times New Roman")
@@ -70,6 +76,197 @@ data_long <- data_raw %>%
 glimpse(data_long)
 ```
 
+# Раздел 4. Анализ безопасности
 
+```{r}
+not_ADAE <- data_raw %>% 
+  select(USUBJID, ARM, contains("_ABN")) %>% 
+  mutate(ARM = ARM %>% as.factor()) %>% 
+  rename_with(~str_remove(.x, "_ABN"), contains("_ABN")) %>% 
+  pivot_longer(!c(USUBJID, ARM),
+               names_to = c("AVISIT", "DOMAIN", "PARAM"),
+               names_sep = "_",
+               names_transform = list(AVISIT = as.factor,
+                                      DOMAIN = as.factor,
+                                      PARAM = as.factor),
+               values_to = "AVAL", 
+               values_transform = list(AVAL = as.logical)) %>% 
+  rename(TRTA = ARM) %>% 
+  filter(AVISIT != "V0")
+```
 
+## 4.1 Анализ витальных показателей, данных ЭКГ
 
+```{r}
+any_AE <- not_ADAE %>% 
+  group_by(USUBJID, TRTA, PARAM) %>% 
+  summarise(AVAL = any(AVAL == TRUE)) %>% 
+  ungroup()
+```
+
+```{r chi-sq-table-wide, eval=FALSE, echo=FALSE}
+# {any_AE %>%
+#   mutate(TRTA = case_when(TRTA == "Angelique" ~ "Анжелик",
+#                           TRTA == "Climaksan" ~ "Климаксан") %>% as.factor,
+#          PARAM = case_when(PARAM == "BP" ~ "Артериальное давление",
+#                            PARAM == "HR" ~ "ЧСС",
+#                            PARAM == "RR" ~ "ЧДД",
+#                            PARAM == "TEMP" ~ "Температура",
+#                            PARAM == "RHYTHM" ~ "Сердечный ритм",
+#                            PARAM == "STT" ~ "Сегменты ST-T",
+#                            PARAM == "QT" ~ "Интервал QT") %>% as.factor(),
+#          AVAL = case_when(AVAL == TRUE ~ "Да",
+#                           AVAL == FALSE ~ "Нет") %>% as.factor()) %>% 
+#   select(-USUBJID) %>%
+#   rename("Терапия" = TRTA) %>% 
+#   tbl_strata(strata = PARAM, .tbl_fun = ~.x %>% 
+#                tbl_summary(by = AVAL,
+#                            statistic = c(all_categorical() ~ "{n} ({p})"),
+#                            digits = c(all_categorical() ~ c(2,2))
+#                            ) %>%
+#                add_p(test = list(all_categorical() ~ "chisq.test"),
+#                      test.args = list(correct = TRUE))  %>%
+#                modify_footnote(
+#                  p.value ~ "χ2 с поправкой Йейтса"
+#                  ) %>%
+#                modify_header(label ~ "Группа")) %>% 
+#   as_flex_table() %>% 
+#   flex_default_fun()} %>% 
+#   add_header_row(values =  "Наличие клинически значимых отклонений по типам показателей и терапии", colwidths = length(.$col_keys))
+```
+
+```{r chi-sq-tb-long}
+table_final_chi_sq <-
+  {any_AE %>%
+  mutate(
+    TRTA = case_when(
+      TRTA == "Angelique" ~ "Анжелик",
+      TRTA == "Climaksan" ~ "Климаксан",
+      TRUE ~ TRTA
+    ) %>% factor(),
+    PARAM = case_when(
+      PARAM == "BP" ~ "Артериальное давление",
+      PARAM == "HR" ~ "ЧСС",
+      PARAM == "RR" ~ "ЧДД",
+      PARAM == "TEMP" ~ "Температура",
+      PARAM == "RHYTHM" ~ "Сердечный ритм",
+      PARAM == "STT" ~ "Сегменты ST-T",
+      PARAM == "QT" ~ "Интервал QT",
+      TRUE ~ PARAM
+    ) %>% factor(),
+    AVAL = case_when(AVAL == TRUE ~ "Да", AVAL == FALSE ~ "Нет", TRUE ~ as.character(AVAL)) %>% factor()
+  ) %>%
+    pivot_wider(names_from = PARAM, values_from = AVAL) %>%
+    rename("Терапия" = TRTA) %>%
+    select(-USUBJID) %>%
+    tbl_summary(
+    by = `Терапия`,
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    digits = all_categorical() ~ 1
+      ) %>%
+    add_p(
+    test = all_categorical() ~ "chisq.test",
+    test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+    modify_header(label ~ "Параметр / Группа") %>%
+    modify_footnote(p.value ~ "χ2 с поправкой Йейтса") %>%
+    bold_labels() %>% 
+  as_flex_table() %>% 
+  flex_default_fun()} %>% 
+  add_header_row(values =  "Наличие клинически значимых отклонений по типам показателей и терапии", colwidths = length(.$col_keys))
+```
+
+\newpage
+**Сводная таблица по типам НЯ в зависимости от группы терапии**
+
+```{r}
+table_final_chi_sq
+```
+
+## 4.2 Анализ количества НЯ по группам
+
+Используем регрессию Пуассона для частотных данных.
+
+Формула модели:
+
+$N_events ~ Pois(λ_x)$
+
+$log(E(N_events | Treatment)) = log(λ_x)$
+
+$var(N_events | Treatment) = λ_x$
+
+$log(λ_x) = b_0 + b_1 × Treatment$
+
+Допущения: 
+
+    1) Независимость наблюдений;
+    
+    2) Отсутствие сверхдисперсии (далее проверяем);
+    
+    3) Отсутствие коллинеарности предикторов (у нас один предиктор, неприменимо).
+
+```{r}
+poisson_df <- not_ADAE %>% 
+  group_by(USUBJID, TRTA) %>% 
+  summarise(AVAL_num = sum(AVAL, na.rm = TRUE)) %>% 
+  ungroup()
+
+glm_AE <- glm(AVAL_num ~ TRTA,
+              data = poisson_df,
+              family = "poisson")
+```
+
+**Проверка модели на сверхдисперсию**
+
+```{r}
+# Функция для проверки наличия сверхдисперсии в модели (автор Ben Bolker)
+# http://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
+# Код модифицирован, чтобы учесть дополнительный параметр в NegBin GLMM, 
+# подобранных MASS::glm.nb()
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)  # Число степеней свободы N - p
+  if (any(class(model) == 'negbin')) rdf <- rdf - 1 ## учитываем k в NegBin GLMM
+  rp <- residuals(model,type='pearson') # Пирсоновские остатки
+  Pearson.chisq <- sum(rp^2) # Сумма квадратов остатков, подчиняется Хи-квадрат распределению 
+  prat <- Pearson.chisq/rdf  # Отношение суммы квадратов остатков к числу степеней свободы
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE) # Уровень значимости
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)        # Вывод результатов
+}
+{overdisp_fun(glm_AE)} %>% 
+  tibble("Names" = names(.)) %>% 
+  rename("Values" = ".") %>% 
+  pivot_wider(names_from = Names, values_from = Values) %>% 
+  mutate(across(c(where(is.numeric), -rdf), ~round(.x, 2))) %>% 
+  rename("χ2" = chisq,
+         "Отношение дисперсий" = ratio,
+         "N степеней свободы" = rdf,
+         "P-value" = p) %>% 
+  flextable() %>% 
+  flex_default_fun() %>% 
+  add_header_row(values = "Результаты теста на сверхдисперсию", colwidth = 4)
+```
+
+**Сводная таблица результатов анализа общей частоты нежелательных явлений в группах терапии с помощью регрессии Пуассона**
+
+```{r}
+{glm_AE %>% broom::tidy(exponentiate = TRUE,
+                       conf.int = TRUE) %>%
+     mutate(p.value = p.value %>%  gtsummary::style_pvalue(),
+            across(c(where(is.numeric), - p.value), ~round(.x, 2))) %>% 
+  slice_tail(n = 1) %>% 
+  mutate(term = "Отношение частоты НЯ (IRR)") %>%
+  select(-statistic) %>% 
+  rename(
+    `Показатель` = term,
+    `Коэффициент (β)` = estimate,
+    `Стандартная ошибка` = std.error,
+    `P-value` = p.value,
+    `Нижн. гр. 95% ДИ` = conf.low,
+    `Верхн. гр. 95% ДИ` = conf.high
+    ) %>% 
+  flextable()} %>% 
+  add_header_row(., values = "Частота НЯ в гр. терапии Климаксаном по отношению к гр. терапии Анжеликом", colwidth = length(.$col_keys)) %>% 
+  flex_default_fun()
+```
+
+По результатам анализа регрессионной модели нахождению коэффициента и 95%ДИ с помощью теста Вальда для показателя терапии, отношение частоты событий (IRR) при терапии Климаксаном по отношению к группе Анжеликом составляет 0.96 (95%ДИ [0.89 ; 1.04]), p-значение теста коэффициента составило 0.3. Данный 95%ДИ накрывает 1 и $p-value > 0.05$, следовательно, частота НЯ в группах различается не значимо.
