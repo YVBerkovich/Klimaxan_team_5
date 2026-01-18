@@ -13,6 +13,8 @@ library(readxl)
 library(readr)
 library(flextable)
 library(survival)
+library(knitr)
+library(gtsummary)
 
 set_flextable_defaults(table.layout = "autofit",
                        font.family = "Times New Roman")
