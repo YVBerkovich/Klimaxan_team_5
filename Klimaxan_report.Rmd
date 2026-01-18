@@ -35,7 +35,62 @@ data_long <- data_raw %>%
   )
 glimpse(data_long)
 ```
+```{r criteria check}
+criteria_check_df <- data_raw %>%
+  select(
+    USUBJID, starts_with("V0")
+  ) %>% 
+  mutate(
+    crit_sex_female   = V0_DEM_SEX == FALSE,
+    crit_age          = between(V0_DEM_AGE, 45, 55),
+    crit_e2           = V0_HOR_E2 < 50,
+    crit_fsh          = V0_HOR_FSH > 40,
+    crit_green        = V0_SYM_GREENE >= 12,
+    crit_flashes      = V0_SYM_FLASHES >= 7,
+    crit_bmi          = between(V0_ANT_BMI, 18, 35),
+    crit_vitals       = V0_VIT_HR_ABN == 0 & V0_VIT_RR_ABN == 0 & V0_VIT_BP_ABN == 0 & V0_VIT_TEMP_ABN == 0,
+    crit_hba1c        = V0_BIO_HBA1C <= 6.5,
+    inclusion_criteria_met_solid = crit_sex_female & crit_age & crit_e2 & crit_fsh & crit_green & crit_flashes & crit_bmi & crit_vitals & crit_hba1c,
+    inclusion_criteria_met_soft = crit_sex_female & crit_age & crit_bmi
+  ) %>% select(
+    USUBJID,
+    starts_with("crit_"),
+    inclusion_criteria_met_solid,
+    inclusion_criteria_met_soft
+  )
 
+not_eligible_solid <- criteria_check_df %>%
+  filter(inclusion_criteria_met_solid == FALSE) %>%
+  mutate(
+    fail_reasons = paste(
+      if_else(!crit_sex_female, "sex", NA_character_),
+      if_else(!crit_age, "age", NA_character_),
+      if_else(!crit_e2, "E2", NA_character_),
+      if_else(!crit_fsh, "FSH", NA_character_),
+      if_else(!crit_green, "Greene", NA_character_),
+      if_else(!crit_flashes, "Flashes", NA_character_),
+      if_else(!crit_bmi, "BMI", NA_character_),
+      if_else(!crit_vitals, "Vitals", NA_character_),
+      if_else(!crit_hba1c, "HbA1c", NA_character_),
+      sep = "; "
+    )
+  )
+
+not_eligible_soft <- criteria_check_df %>%
+  filter(inclusion_criteria_met_soft == FALSE) %>%
+  mutate(
+    fail_reasons = paste(
+      if_else(!crit_sex_female, "sex", NA_character_),
+      if_else(!crit_age, "age", NA_character_),
+      if_else(!crit_bmi, "BMI", NA_character_),
+      sep = "; "
+    )
+  )
+
+glimpse(not_eligible_solid)
+glimpse(not_eligible_soft)
+
+```
 
 
 
