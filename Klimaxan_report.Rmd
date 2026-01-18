@@ -1,0 +1,24 @@
+---
+title: "Klimaxan_report"
+authors: 
+date: "2026-01-18"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(readxl)
+```
+
+
+
+```{r data load}
+
+team5_ecrf_data_dictionary <- read_excel("team5_ecrf_data_dictionary.xlsx")
+View(team5_ecrf_data_dictionary)
+```
+
+
