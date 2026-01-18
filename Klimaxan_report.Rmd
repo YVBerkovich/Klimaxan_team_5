@@ -16,6 +16,7 @@ library(tidyverse)
 library(readxl)
 library(readr)
 library(flextable)
+library(survival)
 library(knitr)
 library(gtsummary)
 
@@ -416,6 +417,12 @@ data_with_time <- calculate_time_to_reduction_fast(data_raw)
 ```
 
 <!-- ANCHOR:SECTION_3_2_START -->
+
+## 3.2 Анализ вторичных конечных точек эффективности клинического исследования
+
+### Подготовка данных и библиотек
+
+
 <!-- ANCHOR:SECTION_3_2_END -->
 
 # Раздел 4. Анализ безопасности
