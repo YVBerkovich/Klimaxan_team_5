@@ -10,13 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(readxl)
+library(readr)
 ```
 
 
 
 ```{r data load}
 
-data_raw <- read_excel("team5_ecrf_data_dictionary.xlsx")
+data_raw <- read_csv("team5_ecrf_wide.csv")
+glimpse(team5_ecrf_wide)
 
 ```
 
