@@ -190,7 +190,6 @@ data_raw <- data_raw %>%
   mutate(delta_f = V0_SYM_FLASHES - V7_SYM_FLASHES)
 ```
 
-
 *Сводная таблица *
 
 ```{r primary 2, echo=FALSE}
@@ -415,7 +414,7 @@ calculate_time_to_reduction_fast <- function(data) {
 data_with_time <- calculate_time_to_reduction_fast(data_raw)
 ```
 
-## 3.2 Анализ вторичных конечных точек эффективности клинического исследования
+## Раздел 3.2 Анализ вторичных конечных точек эффективности клинического исследования
 
 ### Подготовка данных и библиотек
 
