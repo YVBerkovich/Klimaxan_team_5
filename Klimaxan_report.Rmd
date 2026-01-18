@@ -37,7 +37,7 @@ flex_default_fun <- function(x) {
 }
 
 statistics <- list(
-        "N valid" = ~round(sum(!is.na(.)), 2),
+        "N valid" = ~round(sum(!is.na(.)), 0),
         # "Пропущенные значения, n" = ~round(sum(is.na(.)), 2),
         "Среднее" = ~round(mean(., na.rm = TRUE), 2),
         "Стандартное отклонение"   = ~round(sd(., na.rm = TRUE), 2),
@@ -52,10 +52,8 @@ statistics <- list(
 ```
 
 
-
-```{r}
+```{r read-data, message=FALSE}
 data_raw <- read_csv("team5_ecrf_wide.csv")
-glimpse(data_raw)
 ```
 
 
@@ -80,10 +78,12 @@ data_long <- data_raw %>%
 # Раздел 1.  Демографические, антроп. данные и исходные характеристики заболевания 
 
 ``` {r summary baseline tables, echo=FALSE }
-
 baseline_df <- data_raw %>%
   mutate(
-    ARM = factor(ARM)
+    ARM = case_when(
+      ARM == "Angelique" ~ "Анжелик",
+      ARM == "Climaksan" ~ "Климаксан"
+    ) %>% factor()
   ) %>%
   transmute(
     ID = USUBJID,
@@ -208,9 +208,13 @@ desc_stats <- data_raw %>%
     median_delta = median(delta_f, na.rm = TRUE),
     min_delta = min(delta_f, na.rm = TRUE),
     max_delta = max(delta_f, na.rm = TRUE)
-  )
+  ) %>% 
+  mutate(n = n %>% round(0),
+         across(c(where(is.numeric), -n), ~round(.x, 2)))
 
-print(desc_stats)
+desc_stats %>% 
+  flextable() %>%
+  flex_default_fun()
 ```
 
 
@@ -263,7 +267,7 @@ if (t_test_noninf$p.value < alpha && ci_lower_noninf > non_inferiority_margin) {
 
 
 ```{r primary 3, echo=FALSE}
-cat("\n=== Двусторонний t-тест Уэлча для общего сравнения ===\n")
+# cat("\n=== Двусторонний t-тест Уэлча для общего сравнения ===\n")
 t_test_welch <- t.test(delta_f ~ ARM, 
                       data = data_raw,
                       var.equal = FALSE,
@@ -795,8 +799,7 @@ table_final_chi_sq <-
   mutate(
     TRTA = case_when(
       TRTA == "Angelique" ~ "Анжелик",
-      TRTA == "Climaksan" ~ "Климаксан",
-      TRUE ~ TRTA
+      TRTA == "Climaksan" ~ "Климаксан"
     ) %>% factor(),
     PARAM = case_when(
       PARAM == "BP" ~ "Артериальное давление",
@@ -806,9 +809,9 @@ table_final_chi_sq <-
       PARAM == "RHYTHM" ~ "Сердечный ритм",
       PARAM == "STT" ~ "Сегменты ST-T",
       PARAM == "QT" ~ "Интервал QT",
-      TRUE ~ PARAM
     ) %>% factor(),
-    AVAL = case_when(AVAL == TRUE ~ "Да", AVAL == FALSE ~ "Нет", TRUE ~ as.character(AVAL)) %>% factor()
+    AVAL = case_when(AVAL == TRUE ~ "Да",
+                     AVAL == FALSE ~ "Нет") %>% factor()
   ) %>%
     pivot_wider(names_from = PARAM, values_from = AVAL) %>%
     rename("Терапия" = TRTA) %>%
