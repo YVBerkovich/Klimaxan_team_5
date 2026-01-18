@@ -72,6 +72,83 @@ data_long <- data_raw %>%
 glimpse(data_long)
 ```
 
+```{r primary 1, echo=FALSE}
+library(dplyr)
+data_raw <- data_raw %>%
+  mutate(delta_f = V0_SYM_FLASHES - V7_SYM_FLASHES)
+```
 
+
+```{r primary 2, echo=FALSE}
+data_raw$ARM <- factor(data_raw$ARM, levels = c("Climaksan", "Angelique"))
+
+desc_stats <- data_raw %>%
+  group_by(ARM) %>%
+  summarise(
+    n = sum(!is.na(delta_f)),
+    mean_delta = mean(delta_f, na.rm = TRUE),
+    sd_delta = sd(delta_f, na.rm = TRUE),
+    se_delta = sd_delta / sqrt(n),
+    ci_lower = mean_delta - qt(0.975, n-1) * se_delta,
+    ci_upper = mean_delta + qt(0.975, n-1) * se_delta,
+    median_delta = median(delta_f, na.rm = TRUE),
+    min_delta = min(delta_f, na.rm = TRUE),
+    max_delta = max(delta_f, na.rm = TRUE)
+  )
+
+print(desc_stats)
+
+non_inferiority_margin <- -2  
+alpha <- 0.05  
+conf_level <- 1 - alpha  
+
+# Правильные формулировки гипотез:
+# H0: μ_T - μ_R ≤ -2 (Климаксан УСТУПАЕТ Анжелику)
+# H1: μ_T - μ_R > -2 (Климаксан НЕ УСТУПАЕТ Анжелику)
+
+
+t_test_noninf <- t.test(delta_f ~ ARM, 
+                       data = data_raw,  
+                       var.equal = FALSE,
+                       conf.level = conf_level,  
+                       alternative = "greater",  
+                       mu = non_inferiority_margin)  
+
+cat("\n=== Результаты t-теста для проверки не меньшей эффективности ===\n")
+cat(sprintf("Граница не меньшей эффективности (дельта): %.2f\n", non_inferiority_margin))
+cat(sprintf("Статистика t: %.3f\n", t_test_noninf$statistic))
+cat(sprintf("Степени свободы: %.2f\n", t_test_noninf$parameter))
+cat(sprintf("Одностороннее p-значение: %.4f\n", t_test_noninf$p.value))
+cat(sprintf("95%% односторонний ДИ: [%.3f, Inf]\n", t_test_noninf$conf.int[1]))
+cat(sprintf("Разность средних (Климаксан - Анжелик): %.3f\n", 
+            -diff(t_test_noninf$estimate)))  
+
+mean_diff <- -diff(t_test_noninf$estimate)
+se_diff <- sqrt(sum(desc_stats$sd_delta^2 / desc_stats$n))
+df_welch <- t_test_noninf$parameter
+margin <- qt(1 - alpha, df_welch) * se_diff
+ci_lower_noninf <- mean_diff - margin
+
+cat(sprintf("\nТочная оценка разности: %.3f\n", mean_diff))
+cat(sprintf("95%% односторонний ДИ (нижняя граница): %.3f\n", ci_lower_noninf))
+
+cat("\n=== Вывод о не меньшей эффективности ===\n")
+if (t_test_noninf$p.value < alpha && ci_lower_noninf > non_inferiority_margin) {
+  cat("ОТВЕРГАЕМ H0: Климаксан НЕ УСТУПАЕТ Анжелику.\n")
+  cat(sprintf("Нижняя граница 95%% ДИ (%.3f) > границы не меньшей эффективности (%.2f)\n", 
+              ci_lower_noninf, non_inferiority_margin))
+} else {
+  cat("НЕ ОТВЕРГАЕМ H0: Не удалось доказать не меньшую эффективность Климаксана.\n")
+  cat(sprintf("Нижняя граница 95%% ДИ (%.3f) ≤ границе не меньшей эффективности (%.2f)\n", 
+              ci_lower_noninf, non_inferiority_margin))
+}
+
+cat("\n=== Двусторонний t-тест Уэлча для общего сравнения ===\n")
+t_test_welch <- t.test(delta_f ~ ARM, 
+                      data = data_raw,
+                      var.equal = FALSE,
+                      conf.level = 0.95)
+print(t_test_welch)
+```
 
 
