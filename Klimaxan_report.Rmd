@@ -21,8 +21,7 @@ setwd("/Users/natalatimkina/Klimaxan_team_5")
 library(readr)
 data_wide <- read_csv("team5_ecrf_wide.csv")
 ```
-```{r data load}
-data_raw <- read_excel("team5_ecrf_data_dictionary.xlsx")
-```
+
+
 
 
