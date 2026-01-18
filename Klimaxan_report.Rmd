@@ -4,20 +4,25 @@ authors:
 date: "2026-01-18"
 output: word_document
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
 library(tidyverse)
 library(readxl)
 ```
 
+```{r}
+getwd()
+```
+```{r}
+setwd("/Users/natalatimkina/Klimaxan_team_5")
+```
 
-
+```{r}
+library(readr)
+data_wide <- read_csv("team5_ecrf_wide.csv")
+```
 ```{r data load}
-
 data_raw <- read_excel("team5_ecrf_data_dictionary.xlsx")
-
 ```
 
 
