@@ -12,6 +12,7 @@ suppressPackageStartupMessages(library(tidyverse))
 library(readxl)
 library(readr)
 library(flextable)
+library(survival)
 
 set_flextable_defaults(table.layout = "autofit",
                        font.family = "Times New Roman")
@@ -44,17 +45,11 @@ statistics <- list(
 
 ```
 
-# Анализ вторичных конечных точек эффективности клинического исследования
+# 3.2 Анализ вторичных конечных точек эффективности клинического исследования
 
 ## Подготовка данных и библиотек
 
-```{r}
-
-library(dplyr)       
-library(survival)    
-library(flextable)   
-library(ggplot2)     
-
+```{r readr-second-endpoints}
 # ITT-популяция, все пациенты
 data <- read.csv("team5_ecrf_wide.csv", stringsAsFactors = TRUE)
 
