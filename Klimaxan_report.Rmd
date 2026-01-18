@@ -101,7 +101,7 @@ print(desc_stats)
 
 
 
-```{r primary 2, echo=FALSE}
+```{r primary 2-123, echo=FALSE}
 non_inferiority_margin <- -2  
 alpha <- 0.05  
 conf_level <- 1 - alpha  
