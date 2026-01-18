@@ -78,7 +78,7 @@ glimpse(data_long)
 
 # Раздел 4. Анализ безопасности
 
-```{r}
+```{r AE-df}
 not_ADAE <- data_raw %>% 
   select(USUBJID, ARM, contains("_ABN")) %>% 
   mutate(ARM = ARM %>% as.factor()) %>% 
@@ -179,9 +179,11 @@ table_final_chi_sq <-
 \newpage
 **Сводная таблица по типам НЯ в зависимости от группы терапии**
 
-```{r}
+```{r AE-type-table}
 table_final_chi_sq
 ```
+
+По результатам анализа мы не обнаружили значимой ассоциации НЯ различных типов с терапией.
 
 ## 4.2 Анализ количества НЯ по группам
 
@@ -201,11 +203,11 @@ $log(λ_x) = b_0 + b_1 × Treatment$
 
     1) Независимость наблюдений;
     
-    2) Отсутствие сверхдисперсии (далее проверяем);
+    2) Отсутствие сверхдисперсии (проверяется далее);
     
     3) Отсутствие коллинеарности предикторов (у нас один предиктор, неприменимо).
 
-```{r}
+```{r mod-pois}
 poisson_df <- not_ADAE %>% 
   group_by(USUBJID, TRTA) %>% 
   summarise(AVAL_num = sum(AVAL, na.rm = TRUE)) %>% 
@@ -218,7 +220,7 @@ glm_AE <- glm(AVAL_num ~ TRTA,
 
 **Проверка модели на сверхдисперсию**
 
-```{r}
+```{r pois-overdisp}
 # Функция для проверки наличия сверхдисперсии в модели (автор Ben Bolker)
 # http://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
 # Код модифицирован, чтобы учесть дополнительный параметр в NegBin GLMM, 
@@ -246,9 +248,11 @@ overdisp_fun <- function(model) {
   add_header_row(values = "Результаты теста на сверхдисперсию", colwidth = 4)
 ```
 
+Признаков сверхдисперсии не выявлено; в связи с этим переход к квази-пуассоновским или негативно биноминальным моделям не потребовался.
+
 **Сводная таблица результатов анализа общей частоты нежелательных явлений в группах терапии с помощью регрессии Пуассона**
 
-```{r}
+```{r pois-res}
 {glm_AE %>% broom::tidy(exponentiate = TRUE,
                        conf.int = TRUE) %>%
      mutate(p.value = p.value %>%  gtsummary::style_pvalue(),
@@ -265,7 +269,7 @@ overdisp_fun <- function(model) {
     `Верхн. гр. 95% ДИ` = conf.high
     ) %>% 
   flextable()} %>% 
-  add_header_row(., values = "Частота НЯ в гр. терапии Климаксаном по отношению к гр. терапии Анжеликом", colwidth = length(.$col_keys)) %>% 
+  add_header_row(., values = "Отношение частоты НЯ в гр. терапии Климаксаном по сравнению с гр. терапии Анжеликом", colwidth = length(.$col_keys)) %>% 
   flex_default_fun()
 ```
 
