@@ -168,6 +168,17 @@ baseline_table_6 <- make_section_ft (baseline_df, c("Нарушение ритм
 baseline_table_7 <- make_section_ft (baseline_df, c("Гемоглобин", "Лейкоциты", "Тромбоциты"), "Таблица 7. Клинический анализ крови")
 ```
 
+
+```{r print baseline tables, echo=FALSE}
+baseline_table_1
+baseline_table_2
+baseline_table_3
+baseline_table_4
+baseline_table_5
+baseline_table_6
+baseline_table_7
+```
+
 # Раздел 3. Анализ конечных точек
 
 ## Раздел 3.1 Анализ первичной конечной точки
