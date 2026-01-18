@@ -59,7 +59,6 @@ glimpse(data_raw)
 ```
 
 
-
 ``` {r data prep, echo=FALSE}
 data_transformed <- data_raw %>%
   mutate(
@@ -416,14 +415,321 @@ calculate_time_to_reduction_fast <- function(data) {
 data_with_time <- calculate_time_to_reduction_fast(data_raw)
 ```
 
-<!-- ANCHOR:SECTION_3_2_START -->
-
 ## 3.2 Анализ вторичных конечных точек эффективности клинического исследования
 
 ### Подготовка данных и библиотек
 
+```{r readr-second-endpoints}
+# ITT-популяция, все пациенты
+data <- read.csv("team5_ecrf_wide.csv", stringsAsFactors = TRUE)
 
-<!-- ANCHOR:SECTION_3_2_END -->
+data$ARM <- factor(data$ARM, levels = c("Angelique", "Climaksan"))
+
+table(data$ARM)
+ 
+# Проверка структуры данных
+head(data[c("USUBJID","ARM","V0_SYM_FLASHES","V3_SYM_FLASHES","V7_SYM_FLASHES",
+            "V0_SYM_GREENE","V3_SYM_GREENE","V7_SYM_GREENE",
+            "V0_QOL_SF36","V3_QOL_SF36","V7_QOL_SF36")])
+```
+
+В данных используются обозначения визитов V0 (день 0, визит 1, базовый уровень), V3 (день 30, визит 3) и V7 (день 90, визит 7) и т.д. для соответствующих дней исследования.
+
+Все анализы проводятся на ITT-популяции (все 100% рандомизированных пациентов, так как выбывших не было). Во всех тестах принят уровень значимости p \< 0.05.
+
+### 1. Доля случаев \>=50% снижения частоты умеренных/тяжёлых приливов
+
+На визите 3 (день 30) и визите 7 (день 90). Для каждого пациента создадим индикатор достижения снижения частоты приливов на \>=50% по сравнению с исходным уровнем и сравним доли между группами с помощью χ²-теста. Также рассчитаем отношение шансов с 95% доверительным интервалом.
+
+```{r}
+
+data$success50_day30 <- ifelse(data$V3_SYM_FLASHES <= 0.5 * data$V0_SYM_FLASHES, 1, 0)
+data$success50_day90 <- ifelse(data$V7_SYM_FLASHES <= 0.5 * data$V0_SYM_FLASHES, 1, 0)
+ 
+data$success50_day30 <- factor(data$success50_day30, levels = c(0,1), labels = c("No","Yes"))
+data$success50_day90 <- factor(data$success50_day90, levels = c(0,1), labels = c("No","Yes"))
+
+tab30 <- table(Group = data$ARM, "≥50% reduction Day30" = data$success50_day30)
+tab90 <- table(Group = data$ARM, "≥50% reduction Day90" = data$success50_day90)
+tab30; tab90  
+
+chi30 <- chisq.test(tab30)   
+chi90 <- chisq.test(tab90)   
+
+chi30$p.value   
+chi90$p.value   
+
+model30 <- glm(success50_day30 ~ ARM, data = data, family = binomial)
+model90 <- glm(success50_day90 ~ ARM, data = data, family = binomial)
+
+OR_day30 <- exp(coef(model30)[2])  # OR на день 30 (Климаксан относительно Анжелик)
+OR_day90 <- exp(coef(model90)[2])  # OR на день 90
+
+OR_day30_CI <- exp(confint.default(model30)[2, ])  
+OR_day90_CI <- exp(confint.default(model90)[2, ])   
+
+cat(sprintf("Day 30: OR = %.2f, 95%% CI [%.2f; %.2f], p = %.4f\n",
+            OR_day30, OR_day30_CI[1], OR_day30_CI[2], chi30$p.value))
+cat(sprintf("Day 90: OR = %.2f, 95%% CI [%.2f; %.2f], p = %.4f\n",
+            OR_day90, OR_day90_CI[1], OR_day90_CI[2], chi90$p.value))
+```
+
+Описательная статистика по доле достигших \>=50% снижение: сформируем таблицу с численностью и процентом пациентов, достигших эффекта, в каждой группе на 30-й и 90-й день.
+
+```{r}
+ 
+prop_stats <- data %>% group_by(ARM) %>%
+  summarise(
+    N = n(),
+    n_success30 = sum(success50_day30 == "Yes"),
+    perc_success30 = 100 * mean(success50_day30 == "Yes"),
+    n_success90 = sum(success50_day90 == "Yes"),
+    perc_success90 = 100 * mean(success50_day90 == "Yes")
+  )
+
+prop_stats <- prop_stats %>%
+  mutate(
+    Day30 = sprintf("%d (%.1f%%)", n_success30, perc_success30),
+    Day90 = sprintf("%d (%.1f%%)", n_success90, perc_success90)
+  ) %>%
+  select(Группа = ARM, N, "≥50% снижение (День 30)" = Day30, "≥50% снижение (День 90)" = Day90)
+
+ft_prop <- flextable(prop_stats)
+ft_prop <- autofit(ft_prop)
+ft_prop
+```
+
+### 2. Снижение суммы баллов по шкале Greene Climacteric Scale
+
+На визите 3 (день 30) и визите 7 (день 90). Рассчитаем изменение общего балла шкалы Greene от исходного уровня (визит 1) до визитов 3 и 7. Сравнение изменений между группами проводим с помощью t-теста Уэлча (независимые выборки, дисперсии могут различаться). Статистическую значимость оцениваем при p \< 0.05.
+
+```{r}
+# (базовый балл минус балл на визите)  положительное значение означает снижение симптоматики
+data$greene_change_30 <- data$V0_SYM_GREENE - data$V3_SYM_GREENE    
+data$greene_change_90 <- data$V0_SYM_GREENE - data$V7_SYM_GREENE    
+
+greene_stats <- data %>% group_by(ARM) %>%
+  summarise(
+    N = n(),
+    mean_change30 = mean(greene_change_30, na.rm = TRUE),
+    sd_change30   = sd(greene_change_30, na.rm = TRUE),
+    mean_change90 = mean(greene_change_90, na.rm = TRUE),
+    sd_change90   = sd(greene_change_90, na.rm = TRUE)
+  )
+
+greene_stats <- greene_stats %>%
+  mutate(
+    se_change30 = sd_change30 / sqrt(N),
+    ci_lower30 = mean_change30 - 1.96 * se_change30,
+    ci_upper30 = mean_change30 + 1.96 * se_change30,
+    se_change90 = sd_change90 / sqrt(N),
+    ci_lower90 = mean_change90 - 1.96 * se_change90,
+    ci_upper90 = mean_change90 + 1.96 * se_change90
+  )
+
+greene_stats <- greene_stats %>%
+  mutate(
+    `Изм. Greene (день 30) mean±SD` = sprintf("%.2f ± %.2f", mean_change30, sd_change30),
+    `95% ДИ (день 30)` = sprintf("[%.2f; %.2f]", ci_lower30, ci_upper30),
+    `Изм. Greene (день 90) mean±SD` = sprintf("%.2f ± %.2f", mean_change90, sd_change90),
+    `95% ДИ (день 90)` = sprintf("[%.2f; %.2f]", ci_lower90, ci_upper90)
+  ) %>%
+  select(Группа = ARM, N,
+         `Изм. Greene (день 30) mean±SD`,
+         `95% ДИ (день 30)`,
+         `Изм. Greene (день 90) mean±SD`,
+         `95% ДИ (день 90)`)
+
+ft_greene <- flextable(greene_stats)
+ft_greene <- autofit(ft_greene)
+ft_greene
+```
+
+Теперь проведём t-тесты для сравнения изменений между группами:
+
+```{r}
+
+t_green30 <- t.test(greene_change_30 ~ ARM, data = data, var.equal = FALSE)
+t_green90 <- t.test(greene_change_90 ~ ARM, data = data, var.equal = FALSE)
+
+# День 30
+t_green30
+format.pval(t_green30$p.value, digits = 3, eps = 1e-16)
+
+data %>%
+  group_by(ARM) %>%
+  summarise(
+    n = sum(!is.na(greene_change_30)),
+    mean = mean(greene_change_30, na.rm = TRUE),
+    sd = sd(greene_change_30, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+m30_clim <- mean(data$greene_change_30[data$ARM == "Climaksan"], na.rm = TRUE)
+m30_ang  <- mean(data$greene_change_30[data$ARM == "Angelique"], na.rm = TRUE)
+sd30_clim <- sd(data$greene_change_30[data$ARM == "Climaksan"], na.rm = TRUE)
+sd30_ang  <- sd(data$greene_change_30[data$ARM == "Angelique"], na.rm = TRUE)
+
+cat(sprintf(
+  "Изменение балла Greene к дню 30: p = %s (Климаксан: %.2f±%.2f, Анжелик: %.2f±%.2f)\n",
+  format.pval(t_green30$p.value, digits = 3, eps = 1e-16),
+  m30_clim, sd30_clim, m30_ang, sd30_ang
+))
+
+# День 90 
+t_green90
+format.pval(t_green90$p.value, digits = 3, eps = 1e-16)
+
+data %>%
+  group_by(ARM) %>%
+  summarise(
+    n = sum(!is.na(greene_change_90)),
+    mean = mean(greene_change_90, na.rm = TRUE),
+    sd = sd(greene_change_90, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+m90_clim <- mean(data$greene_change_90[data$ARM == "Climaksan"], na.rm = TRUE)
+m90_ang  <- mean(data$greene_change_90[data$ARM == "Angelique"], na.rm = TRUE)
+sd90_clim <- sd(data$greene_change_90[data$ARM == "Climaksan"], na.rm = TRUE)
+sd90_ang  <- sd(data$greene_change_90[data$ARM == "Angelique"], na.rm = TRUE)
+
+cat(sprintf(
+  "Изменение балла Greene к дню 90: p = %s (Климаксан: %.2f±%.2f, Анжелик: %.2f±%.2f)\n",
+  format.pval(t_green90$p.value, digits = 3, eps = 1e-16),
+  m90_clim, sd90_clim, m90_ang, sd90_ang
+))
+
+```
+
+### 3. Время до снижения количества приливов на 2 в сутки
+
+Для оценки периода, необходимого для снижения числа приливов на 2 в день (по данным дневников), используем анализ времени до события. Событие определяем как первое появление значения "число приливов в сутки" на 2 меньше исходного уровня. Все пациенты, не достигшие снижения \>=2 приливов, цензурируются на последнем визите наблюдения (90 дней).
+
+Применим метод Каплана-Мейера для построения кривых **времени до события** в каждой группе и логранговый тест для сравнения кривых.
+
+```{r}
+
+data$time_reduce2 <- NA  # время наступления события или цензуры
+data$event_reduce2 <- 0  
+
+# время события для каждого пациента
+for(i in 1:nrow(data)) {
+  bl <- data$V0_SYM_FLASHES[i]
+  if (!is.na(bl)) {
+    if (data$V2_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 15
+      data$event_reduce2[i] <- 1
+    } else if (data$V3_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 30
+      data$event_reduce2[i] <- 1
+    } else if (data$V4_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 45
+      data$event_reduce2[i] <- 1
+    } else if (data$V5_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 60
+      data$event_reduce2[i] <- 1
+    } else if (data$V6_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 75
+      data$event_reduce2[i] <- 1
+    } else if (data$V7_SYM_FLASHES[i] <= bl - 2) {
+      data$time_reduce2[i] <- 90
+      data$event_reduce2[i] <- 1
+    } else {
+      # событие не произошло к 90 дню: цензурируем на 90 день
+      data$time_reduce2[i] <- 90
+      data$event_reduce2[i] <- 0
+    }
+  }
+}
+
+table(data$event_reduce2, data$ARM)  # распределение событий/цензуры по группам
+
+# Анализ Каплана-Мейера
+surv_obj <- Surv(time = data$time_reduce2, event = data$event_reduce2)
+km_fit <- survfit(surv_obj ~ ARM, data = data)
+print(km_fit)
+
+# Логранговый тест для сравнения кривых выживания 
+logrank_test <- survdiff(surv_obj ~ ARM, data = data)
+logrank_test$chisq   
+p_logrank <- 1 - pchisq(logrank_test$chisq, df = 1)  
+p_logrank
+cat(sprintf("Логранговый тест: χ² = %.2f, p = %.2e\n", logrank_test$chisq, p_logrank))
+
+#  медиана времени до события в каждой группе (если >50% пациентов достигли событие)
+medians <- quantile(km_fit, probs = 0.5)
+medians
+
+plot(km_fit, col=c("blue","red"), lty=1:2, xlab="Дни", ylab="Доля без снижения приливов на 2",
+     main="Время до снижения количества приливов на 2 в сутки")
+legend("bottomleft", legend = levels(data$ARM), col=c("blue","red"), lty=1:2)
+
+```
+
+На графике выше по оси y отложена доля пациентов, не достигших снижения количества приливов на 2. Кривые Каплана-Мейера показывают вероятность того, что событие ещё не произошло в зависимости от времени. Заметное расхождение кривых и полученное p-значение логрангового теста указывают на различие между группами.
+
+### 4. Увеличение суммы баллов по шкале SF-36
+
+На визите 3 (день 30) и визите 7 (день 90). Рассчитаем изменение общего балла SF-36 от исходного уровня: положительное изменение означает улучшение качества жизни. Сравним средние улучшения между группами с помощью t-теста Уэлча.
+
+```{r}
+ 
+data$sf36_change_30 <- data$V3_QOL_SF36 - data$V0_QOL_SF36   # изменение к дню 30 (увеличение)
+data$sf36_change_90 <- data$V7_QOL_SF36 - data$V0_QOL_SF36   # изменение к дню 90
+
+sf36_stats_raw <- data %>% 
+  group_by(ARM) %>%
+  summarise(
+    N = sum(!is.na(sf36_change_30)),
+    mean_change30 = mean(sf36_change_30, na.rm = TRUE),
+    sd_change30   = sd(sf36_change_30, na.rm = TRUE),
+    mean_change90 = mean(sf36_change_90, na.rm = TRUE),
+    sd_change90   = sd(sf36_change_90, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+sf36_stats <- sf36_stats_raw %>%
+  mutate(
+    se_change30 = sd_change30 / sqrt(N),
+    ci_lower30 = mean_change30 - 1.96 * se_change30,
+    ci_upper30 = mean_change30 + 1.96 * se_change30,
+    se_change90 = sd_change90 / sqrt(N),
+    ci_lower90 = mean_change90 - 1.96 * se_change90,
+    ci_upper90 = mean_change90 + 1.96 * se_change90
+  ) %>%
+  mutate(
+    `Изм. SF-36 (день 30) mean±SD` = sprintf("%.2f ± %.2f", mean_change30, sd_change30),
+    `95% ДИ (день 30)` = sprintf("[%.2f; %.2f]", ci_lower30, ci_upper30),
+    `Изм. SF-36 (день 90) mean±SD` = sprintf("%.2f ± %.2f", mean_change90, sd_change90),
+    `95% ДИ (день 90)` = sprintf("[%.2f; %.2f]", ci_lower90, ci_upper90)
+  ) %>%
+  select(Группа = ARM, N,
+         `Изм. SF-36 (день 30) mean±SD`, `95% ДИ (день 30)`,
+         `Изм. SF-36 (день 90) mean±SD`, `95% ДИ (день 90)`)
+
+ft_sf36 <- flextable(sf36_stats)
+ft_sf36 <- autofit(ft_sf36)
+ft_sf36
+
+t_sf30 <- t.test(sf36_change_30 ~ ARM, data = data, var.equal = FALSE)
+t_sf90 <- t.test(sf36_change_90 ~ ARM, data = data, var.equal = FALSE)
+
+t_sf30$p.value
+t_sf90$p.value
+
+m_clim <- sf36_stats_raw$mean_change30[sf36_stats_raw$ARM == "Climaksan"]
+sd_clim <- sf36_stats_raw$sd_change30[sf36_stats_raw$ARM == "Climaksan"]
+m_ang  <- sf36_stats_raw$mean_change30[sf36_stats_raw$ARM == "Angelique"]
+sd_ang <- sf36_stats_raw$sd_change30[sf36_stats_raw$ARM == "Angelique"]
+
+cat(sprintf(
+  "Увеличение SF-36 к дню 30: p = %s (Климаксан: %.1f±%.1f, Анжелик: %.1f±%.1f)\n",
+  format.pval(t_sf30$p.value, digits = 3, eps = 1e-16),
+  m_clim, sd_clim, m_ang, sd_ang
+))
+
+```
 
 # Раздел 4. Анализ безопасности
 
