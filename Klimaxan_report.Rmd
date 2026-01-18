@@ -6,8 +6,42 @@ output: word_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
 library(tidyverse)
 library(readxl)
+library(readr)
+library(flextable)
+
+set_flextable_defaults(table.layout = "autofit",
+                       font.family = "Times New Roman")
+
+flex_default_fun <- function(x) {
+  x %>% 
+  theme_box() %>%
+  font(fontname = "Times New Roman", part = "all") %>% 
+  fontsize(size = 13, part = "header") %>% 
+  fontsize(size = 12, part = "body") %>% 
+  flextable::align(
+  i = 1,
+  j = NULL,
+  align = "center",
+  part = "header")
+}
+
+statistics <- list(
+        "N valid" = ~round(sum(!is.na(.)), 2),
+        # "Пропущенные значения, n" = ~round(sum(is.na(.)), 2),
+        "Среднее" = ~round(mean(., na.rm = TRUE), 2),
+        "Стандартное отклонение"   = ~round(sd(., na.rm = TRUE), 2),
+        "Медиана" = ~round(median(., na.rm = TRUE), 2),
+        "Q1" = ~round(quantile(., 0.25, na.rm = TRUE), 2),
+        "Q3" = ~round(quantile(., 0.75, na.rm = TRUE), 2),
+        "IQR" = ~round(IQR(., na.rm = TRUE), 2),
+        "Мин"  = ~round(min(., na.rm = TRUE), 2),
+        "Макс"  = ~round(max(., na.rm = TRUE), 2)
+      )
+
 ```
 
 ```{r}
@@ -19,7 +53,23 @@ setwd("/Users/natalatimkina/Klimaxan_team_5")
 
 ```{r}
 library(readr)
-data_wide <- read_csv("team5_ecrf_wide.csv")
+data_raw <- read_csv("team5_ecrf_wide.csv")
+glimpse(data_raw)
+```
+
+``` {r data prep, echo=FALSE}
+
+data_long <- data_raw %>%
+  pivot_longer(
+    cols = matches("^V[0-9]+_"),
+    names_to = "var",
+    values_to = "value"
+  ) %>%
+  mutate(
+    visit = str_extract(var, "^V[0-9]+"),
+    varname = str_remove(var, "^V[0-9]+_")
+  )
+glimpse(data_long)
 ```
 
 
