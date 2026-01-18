@@ -77,7 +77,7 @@ data_long <- data_raw %>%
 
 # Раздел 1.  Демографические, антроп. данные и исходные характеристики заболевания 
 
-``` {r summary baseline tables, echo=FALSE }
+``` {r summary baseline tables, echo=TRUE }
 baseline_df <- data_raw %>%
   mutate(
     ARM = case_when(
@@ -185,14 +185,14 @@ baseline_table_7
 
 Считаем уменьшение приливов к последнему визиту по сравнению с базовым уровнем.
 
-```{r primary 1, echo=FALSE}
+```{r primary 1, TRUE=FALSE}
 data_raw <- data_raw %>%
   mutate(delta_f = V0_SYM_FLASHES - V7_SYM_FLASHES)
 ```
 
 *Сводная таблица *
 
-```{r primary 2, echo=FALSE}
+```{r primary 2, TRUE=FALSE}
 data_raw <- data_raw %>% 
   mutate(ARM = ARM %>% as.factor() %>% forcats::fct_rev())
 
@@ -219,7 +219,7 @@ desc_stats %>%
 
 
 
-```{r primary 2-123, echo=FALSE}
+```{r primary 2-123, echo=TRUE}
 non_inferiority_margin <- -2  
 alpha <- 0.05  
 conf_level <- 1 - alpha  
@@ -266,7 +266,7 @@ if (t_test_noninf$p.value < alpha && ci_lower_noninf > non_inferiority_margin) {
 
 
 
-```{r primary 3, echo=FALSE}
+```{r primary 3, echo=TRUE}
 # cat("\n=== Двусторонний t-тест Уэлча для общего сравнения ===\n")
 t_test_welch <- t.test(delta_f ~ ARM, 
                       data = data_raw,
@@ -298,7 +298,7 @@ t_test_welch %>% broom::tidy() %>%
 
 
 
-```{r primary 4, echo=FALSE}
+```{r primary 4, echo=TRUE}
 density_plot <- ggplot(data_raw, aes(x = delta_f)) +
   geom_histogram(aes(y = after_stat(density), fill = ARM), 
                  alpha = 0.5, position = "identity", bins = 30) +
@@ -324,7 +324,7 @@ print(density_plot)
 
 
 
-```{r primary 5, echo=FALSE}
+```{r primary 5, message=FALSE}
 library(ggplot2)
 library(dplyr)
 
@@ -370,52 +370,6 @@ forest_plot <- ggplot(plot_data, aes(x = Estimate, y = Comparison)) +
   )
 
 print(forest_plot)
-```
-
-
-
-```{r sec-end-time}
-calculate_time_to_reduction_fast <- function(data) {
-
-  visit_days <- c(0, 15, 30, 45, 60, 75, 90)
-
-  flash_cols <- c("V0_SYM_FLASHES", "V2_SYM_FLASHES", "V3_SYM_FLASHES", 
-                  "V4_SYM_FLASHES", "V5_SYM_FLASHES", "V6_SYM_FLASHES", 
-                  "V7_SYM_FLASHES")
-  
-  results <- data_raw %>%
-    mutate(
-      baseline = V0_SYM_FLASHES,
-      target = baseline - 2,
-      reduction_day = case_when(
-        !is.na(V2_SYM_FLASHES) & V2_SYM_FLASHES <= target ~ 15,
-        !is.na(V3_SYM_FLASHES) & V3_SYM_FLASHES <= target ~ 30,
-        !is.na(V4_SYM_FLASHES) & V4_SYM_FLASHES <= target ~ 45,
-        !is.na(V5_SYM_FLASHES) & V5_SYM_FLASHES <= target ~ 60,
-        !is.na(V6_SYM_FLASHES) & V6_SYM_FLASHES <= target ~ 75,
-        !is.na(V7_SYM_FLASHES) & V7_SYM_FLASHES <= target ~ 90,
-        TRUE ~ NA_real_
-      ),
-      event_status = if_else(is.na(reduction_day), 0, 1),
-      
-      time_to_event = if_else(
-        event_status == 1,
-        reduction_day,
-        90
-      ),
-      
-      time_to_event = case_when(
-        is.na(baseline) | baseline < 2 ~ NA_real_,
-        event_status == 1 ~ reduction_day,
-        TRUE ~ 90
-      )
-    ) %>%
-    select(-c(target, reduction_day))
-  
-  return(results)
-}
-
-data_with_time <- calculate_time_to_reduction_fast(data_raw)
 ```
 
 ## Раздел 3.2 Анализ вторичных конечных точек эффективности клинического исследования
@@ -836,7 +790,7 @@ table_final_chi_sq <-
 \newpage
 **Сводная таблица по типам НЯ в зависимости от группы терапии**
 
-```{r AE-type-table}
+```{r AE-type-table, echo=FALSE}
 table_final_chi_sq
 ```
 
