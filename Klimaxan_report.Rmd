@@ -9,7 +9,6 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-library(readr)
 library(readxl)
 ```
 
@@ -17,8 +16,8 @@ library(readxl)
 
 ```{r data load}
 
-team5_ecrf_data_dictionary <- read_excel("team5_ecrf_data_dictionary.xlsx")
-View(team5_ecrf_data_dictionary)
+data_raw <- read_excel("team5_ecrf_data_dictionary.xlsx")
+
 ```
 
 
