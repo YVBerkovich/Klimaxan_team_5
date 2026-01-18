@@ -18,7 +18,7 @@ library(readr)
 ```{r data load}
 
 data_raw <- read_csv("team5_ecrf_wide.csv")
-glimpse(team5_ecrf_wide)
+glimpse(data_raw)
 
 ```
 
