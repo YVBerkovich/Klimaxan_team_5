@@ -274,3 +274,39 @@ overdisp_fun <- function(model) {
 ```
 
 По результатам анализа регрессионной модели нахождению коэффициента и 95%ДИ с помощью теста Вальда для показателя терапии, отношение частоты событий (IRR) при терапии Климаксаном по отношению к группе Анжеликом составляет 0.96 (95%ДИ [0.89 ; 1.04]), p-значение теста коэффициента составило 0.3. Данный 95%ДИ накрывает 1 и $p-value > 0.05$, следовательно, частота НЯ в группах различается не значимо.
+
+```{r, fig.width=5, fig.height=3, dpi=300}
+# Подготовка данных для графика
+plot_pois_df <- data.frame(
+  Comparison = "",
+  Estimate = 1.04,
+  CI_lower = 0.96,
+  CI_upper = 1.13,
+  Margin = 1,
+  p_value = 0.3
+)
+
+# Создание графика
+forest_plot_pois <- ggplot(plot_pois_df, aes(x = Estimate, y = Comparison)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red", size = 1) +
+  geom_point(size = 4) +
+  geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), 
+                 height = 0.1, size = 1, color = "blue") +
+  annotate("text", x = 1.1, y = 1.3, 
+           label = sprintf("IRR: %.2f\n95%% ДИ: [%.2f; %.2f]\nP = %.1f", 
+                          1.04, 0.96, 1.13, 0.3),
+           hjust = 0.5, vjust = 0.5, color = "black") +
+  scale_x_continuous(breaks = seq(0,5, 0.02),
+                     name = "Отношение частот, IRR (Климаксан / Анжелик)") +
+  labs(title = "Анализ безопасности",
+       subtitle = "Отношение частоты НЯ (IRR)\nв группе Климаксан\nпо отношению к Анжелик",
+       y = "") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 12)
+  )
+
+print(forest_plot_pois)
+```
+
