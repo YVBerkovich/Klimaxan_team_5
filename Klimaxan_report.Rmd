@@ -299,6 +299,7 @@ calculate_time_to_reduction_fast <- function(data) {
 }
 
 data_with_time <- calculate_time_to_reduction_fast(data_raw)
+```
 
 # Раздел 4. Анализ безопасности
 
